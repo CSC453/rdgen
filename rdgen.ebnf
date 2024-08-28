@@ -1,0 +1,74 @@
+<< from grammar import TopCode, TopPragma, TopLevel, mkAlts,mkSequence,Production,Infinite,Value,Alts,Sym,Opt,Rep,Parens,Spec,Break,Expr,Continue,OnePlus,Sequence >>
+<< from scanner import Token >>
+
+%% spec.return = "Spec"
+spec:
+    grammar
+    = << Spec(grammar) >>
+    .
+
+%% grammar.return = "list[TopLevel]"
+%% grammar.prods = "list[TopLevel]"
+grammar:
+    { 
+          production 
+        | code =<<TopCode(code)>> 
+        | pragma =<<TopPragma(pragma)>> 
+    }
+    .
+
+%% production.return = "Production"
+production: 
+    id'lhs 
+    ":" 
+    alternation'rhs 
+    "." 
+    = << Production(lhs, rhs) >> 
+    .
+
+%% alternation.return = "Alts | Sequence"
+%% alternation.seqs = "list[Sequence]"
+alternation: 
+    {* =sequence [break] "|" *}'seqs
+    =<< mkAlts(seqs) >>
+    .
+
+%% sequence.return = "Sequence"
+%% sequence.ts = "list[Expr]"
+sequence: 
+    { term }'ts
+    =<< mkSequence(ts) >> 
+    .
+
+%% term.return = "Expr"
+%% term.stmts = "list[str]"
+term: 
+    [ "=" ]     'at 
+    base        't 
+    [ "!" ]     'simple
+    [ "'" =id ] 'name 
+    << t.keep   = at is not None       >>
+    << t.simple = simple is not None   >>
+    << t.name   = name or None         >>
+    =<< t >>
+    .
+
+%% base.return = "Expr"
+%% base.code = "str"
+base:
+    "(" alternation'v ")"     =<< Parens(v)  >>
+    | "{" alternation'v "}"   =<< Rep(v)     >>
+    | "[" alternation'v "]"   =<< Opt(v)     >>
+    | "{+" alternation'v "+}" =<< OnePlus(v) >>
+    | "{*" alternation'v "*}" =<< Infinite(v) >>
+    | id                      =<< Sym(id)    >>
+    | string                  =<< Sym(string) >>
+    | code                    =<< Value(code) >>
+    | "break"                 =<< Break()    >>
+    | "continue"              =<< Continue() >>
+    .
+
+code   : CODE'c   =<< c.value.strip() >> .        %% code.return = "str"
+id     : ID'id    =<< id.value        >> .        %% id.return  = "str"
+string : STR'id   =<< id.value        >> .        %% str.return = "str"
+pragma : PRAGMA'p =<< p.value         >> .        %% pragma.return = "str"
